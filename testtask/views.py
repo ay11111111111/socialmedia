@@ -7,16 +7,20 @@ from rest_framework.decorators import action
 from rest_framework.generics import ListAPIView
 from rest_framework.views import APIView
 from django_filters.rest_framework import DjangoFilterBackend
-
 from .models import Post, LikeAnalytics
-
+from users.models import Profile
 from .serializers import (  PostCreateSerializer,
                             PostSerializer,
                             LikeAnalyticsSerializer
                             )
 from .filters import LikeAnalyticsFilter
 import datetime
+from django.utils import timezone
 
+def update_last_activity(user):
+    profile = Profile.objects.get(user=user)
+    profile.last_activity = timezone.now()
+    profile.save()
 
 class PostCreateView(viewsets.GenericViewSet):
     """
@@ -38,6 +42,7 @@ class PostCreateView(viewsets.GenericViewSet):
             data['author'] = post.author.username
             data['title'] = post.title
             data['text'] = post.text
+            update_last_activity(user)
             return Response(data, status=status.HTTP_201_CREATED)
         else:
             data = serializer.errors
@@ -76,7 +81,7 @@ class PostLikeView(viewsets.GenericViewSet):
             today_analytics.save()
         else:
             LikeAnalytics.objects.create(date=now, num_of_likes=1)
-
+        update_last_activity(request.user)
         return Response(status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['put'])
@@ -95,6 +100,8 @@ class PostLikeView(viewsets.GenericViewSet):
                 today_analytics = LikeAnalytics.objects.get(date=now)
                 today_analytics.num_of_likes -= 1
                 today_analytics.save()
+            update_last_activity(request.user)
+            return Response(status=status.HTTP_200_OK)
         else:
             return Response(status=status.HTTP_400_BAD_REQUEST)
 
